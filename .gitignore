@@ -1,0 +1,27 @@
+# Виртуальное окружение
+venv/
+env/
+.venv/
+
+# Кэш Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Настройки PyCharm
+.idea/
+
+# Скомпилированные файлы
+*.so
+*.egg-info/
+dist/
+build/
+
+# Переменные окружения
+.env
+
+# Личные временные папки
+arxiv/
+idei/
+snake-html5/
+pict/
