@@ -66,7 +66,7 @@ class SnakeLogic:
         pos = random.choice(free_cells)
         b_type = random.choice(["gold", "slow", "magnet"])
         self.bonus = (pos[0], pos[1], b_type)
-        self.bonus_ttl = 50
+        self.bonus_ttl = 150
 
     def set_direction(self, new_dir):
         if new_dir != (-self.direction[0], -self.direction[1]):
