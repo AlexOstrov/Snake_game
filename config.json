@@ -5,5 +5,8 @@
   "height": 20,
   "cell_size": 25,
   "score_acceleration": 2,
-  "theme_name": "Dark"
+  "theme_name": "Dark",
+  "bonus_ttl": 60,
+  "slow_effect_duration": 150,
+  "magnet_effect_duration": 150
 }

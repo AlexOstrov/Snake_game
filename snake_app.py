@@ -18,7 +18,7 @@ class FloatingText:
         self.canvas = canvas
         self.x = x
         self.y = y
-        self.life = 30
+        self.life = 35
         self.id = self.canvas.create_text(x, y, text=text, fill=color, font=("Arial", 16, "bold"))
         self.animate()
 
@@ -63,7 +63,12 @@ class SnakeApp:
             self.current_theme_name = "Dark"
 
         # 2. Логика игры
-        self.game = SnakeLogic(config["width"], config["height"])
+        # ✅ Читаем длительности эффектов из конфига
+        self.slow_effect_duration = config.get("slow_effect_duration", 150)
+        self.magnet_effect_duration = config.get("magnet_effect_duration", 150)
+        # ✅ Передаем bonus_ttl в логику игры
+        bonus_ttl = config.get("bonus_ttl", 60)
+        self.game = SnakeLogic(config["width"], config["height"], bonus_ttl=bonus_ttl)
         self.cell_size = config["cell_size"]
 
         # 3. Графика (Спрайты)
@@ -304,12 +309,8 @@ class SnakeApp:
                         "y": head_y * self.cell_size + self.cell_size / 2,
                         "text": "🧲 +1",
                         "color": "#FF1493",
-                        "life": 20
+                        "life": 25
                     })
-
-                    # Шанс появления бонуса (как при обычном съедании)
-                    # if random.random() < 0.15:
-                    #    self.game._spawn_bonus()
                 else:
                     # Просто двигаем еду
                     self.game.food = (food_x, food_y)
@@ -329,24 +330,27 @@ class SnakeApp:
         # 2. Бонусы
         if self.game.bonus:
             bx, by, b_type = self.game.bonus
-            px, py = bx * self.cell_size, by * self.cell_size
-            color = self.theme.get("bonus_gold") if b_type == "gold" else \
-                self.theme.get("bonus_slow") if b_type == "slow" else \
-                    self.theme.get("bonus_magnet", "#FF1493")  # ✅ Цвет для магнита
 
-            sprite = self.bonus_gold_sprite if b_type == "gold" else \
-                self.bonus_slow_sprite if b_type == "slow" else \
-                    self.bonus_magnet_sprite  # ✅ Спрайт магнита
+            # ✅ Проверяем, нужно ли скрыть бонус (эффект мигания перед исчезновением)
+            is_blinking = self.game.bonus_ttl < 15 and (self.game.bonus_ttl // 3) % 2 == 0
 
-            if sprite:
-                self.canvas.create_image(px, py, image=sprite, anchor=tk.NW, tags="dynamic")
-            else:
-                self.canvas.create_oval(px + 2, py + 2, px + self.cell_size - 2, py + self.cell_size - 2,
-                                        fill=color, outline="white", width=2, tags="dynamic")
+            # Рисуем бонус ТОЛЬКО если он не в "слепой" фазе мигания
+            if not is_blinking:
+                px, py = bx * self.cell_size, by * self.cell_size
+                color = self.theme.get("bonus_gold") if b_type == "gold" else \
+                    self.theme.get("bonus_slow") if b_type == "slow" else \
+                        self.theme.get("bonus_magnet", "#FF1493")
 
-            if self.game.bonus_ttl < 15 and (self.game.bonus_ttl // 3) % 2 == 0:
-                self.canvas.create_oval(px + 2, py + 2, px + self.cell_size - 2, py + self.cell_size - 2,
-                                        fill="#fff", outline="", tags="dynamic")
+                sprite = self.bonus_gold_sprite if b_type == "gold" else \
+                    self.bonus_slow_sprite if b_type == "slow" else \
+                        self.bonus_magnet_sprite
+
+                if sprite:
+                    self.canvas.create_image(px, py, image=sprite, anchor=tk.NW, tags="dynamic")
+                else:
+                    # Fallback: овал, если спрайт не найден
+                    self.canvas.create_oval(px + 2, py + 2, px + self.cell_size - 2, py + self.cell_size - 2,
+                                            fill=color, outline="white", width=2, tags="dynamic")
 
         # 3. Змейка (Интерполяция + ДИНАМИЧЕСКАЯ СМЕНА СПРАЙТОВ)
         # Это исправляет ВСЕ 3 ошибки: направление головы, направление хвоста и превращение хвоста в тело
@@ -424,9 +428,11 @@ class SnakeApp:
         self._last_time = now
         dt = min(dt, 0.1)  # Защита от скачков
 
-        # ✅ Уменьшаем таймер магнита
+        # ✅ Уменьшаем ВСЕ таймеры эффектов
         if self.magnet_effect_timer > 0:
             self.magnet_effect_timer -= 1
+        if self.slow_effect_timer > 0:  # ← ДОБАВЛЕНО
+            self.slow_effect_timer -= 1
 
         # Логический шаг (срабатывает когда прогресс >= 1.0)
         if self.move_progress >= 1.0:
@@ -446,10 +452,7 @@ class SnakeApp:
             if len(self.curr_positions) > len(self.snake_items):
                 tail_x, tail_y = self.curr_positions[-1]
                 px, py = tail_x * self.cell_size, tail_y * self.cell_size
-
-                # Создаем временный спрайт (render исправит его направление мгновенно)
                 sprite = self.snake_sprites.get(("right", "tail"))
-
                 if sprite:
                     item = self.canvas.create_image(px, py, image=sprite, anchor=tk.NW, tags="snake")
                 else:
@@ -461,9 +464,14 @@ class SnakeApp:
             self.move_progress = 0.0
 
         # Продвигаем прогресс анимации
+        # ✅ Учитываем замедление при расчете длительности шага
         step_duration = self.current_delay / 1000.0
+        if self.slow_effect_timer > 0:  # ← ДОБАВЛЕНО
+            step_duration += 0.04  # Добавляем 40мс замедления
+
         self.move_progress += dt / step_duration
-        if self.move_progress > 1.0: self.move_progress = 1.0
+        if self.move_progress > 1.0:
+            self.move_progress = 1.0
 
         # Рендер
         self.render()
@@ -488,12 +496,14 @@ class SnakeApp:
                                      "y": hy * self.cell_size + self.cell_size / 2,
                                      "text": "+5", "color": "#FFD700", "life": 30})
             elif event == "eat_bonus_slow":
-                self.slow_effect_timer = 100
+                # ✅ Используем значение из конфига
+                self.slow_effect_timer = self.slow_effect_duration
                 self.effects.append({"x": hx * self.cell_size + self.cell_size / 2,
                                      "y": hy * self.cell_size + self.cell_size / 2,
                                      "text": "❄️ SLOW", "color": "#00BFFF", "life": 30})
             elif event == "eat_bonus_magnet":  # ✅ Обработка магнита
-                self.magnet_effect_timer = 150  # 15 секунд (150 тиков * 100мс)
+                # ✅ Используем значение из конфига
+                self.magnet_effect_timer = self.magnet_effect_duration
                 self.effects.append({"x": hx * self.cell_size + self.cell_size / 2,
                                      "y": hy * self.cell_size + self.cell_size / 2,
                                      "text": "🧲 MAGNET", "color": "#FF1493", "life": 30})
@@ -564,9 +574,11 @@ class SnakeApp:
         self.render()
 
     def restart(self):
-        self.game = SnakeLogic(self.config["width"], self.config["height"])
+        # ✅ Передаем bonus_ttl (Time To Live (TTL). Время жизни бонуса на игровом поле) при пересоздании логики
+        bonus_ttl = self.config.get("bonus_ttl", 60)
+        self.game = SnakeLogic(self.config["width"], self.config["height"], bonus_ttl=bonus_ttl)
         self.current_delay = self.initial_speed
-        self.slow_effect_timer = 0
+        self.slow_effect_timer = 0 # ✅ Сброс таймера снежинки
         self.magnet_effect_timer = 0  # ✅ Сброс таймера магнита
         self.is_paused = False
         self.session_bonuses = 0
@@ -661,7 +673,7 @@ class SnakeApp:
 
         elif self.test_event == "eat_bonus_slow":
             # Применяем эффект: замедление
-            self.slow_effect_timer = 100
+            self.slow_effect_timer = 150
             self.effects.append({
                 "x": hx * self.cell_size + self.cell_size / 2,
                 "y": hy * self.cell_size + self.cell_size / 2,
