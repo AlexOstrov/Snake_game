@@ -63,7 +63,12 @@ class SnakeApp:
             self.current_theme_name = "Dark"
 
         # 2. Логика игры
-        self.game = SnakeLogic(config["width"], config["height"])
+        # ✅ Читаем длительности эффектов из конфига
+        self.slow_effect_duration = config.get("slow_effect_duration", 150)
+        self.magnet_effect_duration = config.get("magnet_effect_duration", 150)
+        # ✅ Передаем bonus_ttl в логику игры
+        bonus_ttl = config.get("bonus_ttl", 60)
+        self.game = SnakeLogic(config["width"], config["height"], bonus_ttl=bonus_ttl)
         self.cell_size = config["cell_size"]
 
         # 3. Графика (Спрайты)
@@ -491,12 +496,14 @@ class SnakeApp:
                                      "y": hy * self.cell_size + self.cell_size / 2,
                                      "text": "+5", "color": "#FFD700", "life": 30})
             elif event == "eat_bonus_slow":
-                self.slow_effect_timer = 150
+                # ✅ Используем значение из конфига
+                self.slow_effect_timer = self.slow_effect_duration
                 self.effects.append({"x": hx * self.cell_size + self.cell_size / 2,
                                      "y": hy * self.cell_size + self.cell_size / 2,
                                      "text": "❄️ SLOW", "color": "#00BFFF", "life": 30})
             elif event == "eat_bonus_magnet":  # ✅ Обработка магнита
-                self.magnet_effect_timer = 150  # 15 секунд (150 тиков * 100мс)
+                # ✅ Используем значение из конфига
+                self.magnet_effect_timer = self.magnet_effect_duration
                 self.effects.append({"x": hx * self.cell_size + self.cell_size / 2,
                                      "y": hy * self.cell_size + self.cell_size / 2,
                                      "text": "🧲 MAGNET", "color": "#FF1493", "life": 30})
@@ -567,9 +574,11 @@ class SnakeApp:
         self.render()
 
     def restart(self):
-        self.game = SnakeLogic(self.config["width"], self.config["height"])
+        # ✅ Передаем bonus_ttl (Time To Live (TTL). Время жизни бонуса на игровом поле) при пересоздании логики
+        bonus_ttl = self.config.get("bonus_ttl", 60)
+        self.game = SnakeLogic(self.config["width"], self.config["height"], bonus_ttl=bonus_ttl)
         self.current_delay = self.initial_speed
-        self.slow_effect_timer = 0
+        self.slow_effect_timer = 0 # ✅ Сброс таймера снежинки
         self.magnet_effect_timer = 0  # ✅ Сброс таймера магнита
         self.is_paused = False
         self.session_bonuses = 0

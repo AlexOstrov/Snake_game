@@ -2,19 +2,19 @@ import random
 
 
 class SnakeLogic:
-    def __init__(self, width=20, height=20):
+    # ✅ Добавляем параметр bonus_ttl
+    def __init__(self, width=20, height=20, bonus_ttl=50):
         self.width = width
         self.height = height
         self.snake = [(width // 2, height // 2)]
         self.direction = (1, 0)
 
-        # --- Новые поля ---
         self.walls = set()
-        self._generate_walls(8)  # Генерируем 8 случайных блоков
+        self._generate_walls(8)
 
-        self.bonus = None  # (x, y, type)
-        self.bonus_ttl = 0  # Время жизни бонуса (тиков)
-        # ------------------
+        self.bonus = None
+        self.bonus_ttl = 0
+        self.bonus_ttl_default = bonus_ttl  # ✅ Сохраняем значение из конфига
 
         self.food = self._spawn_food()
         self.score = 0
@@ -66,7 +66,8 @@ class SnakeLogic:
         pos = random.choice(free_cells)
         b_type = random.choice(["gold", "slow", "magnet"])
         self.bonus = (pos[0], pos[1], b_type)
-        self.bonus_ttl = 150
+        # ✅ Используем значение из конфига вместо хардкода
+        self.bonus_ttl = self.bonus_ttl_default
 
     def set_direction(self, new_dir):
         if new_dir != (-self.direction[0], -self.direction[1]):
@@ -121,7 +122,6 @@ class SnakeLogic:
             elif b_type == "magnet":
                 self.bonus = None
                 return "eat_bonus_magnet"
-
         else:
             self.snake.pop()
 
