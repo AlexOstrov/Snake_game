@@ -15,6 +15,7 @@ from tkinter import simpledialog, messagebox
 import json
 import os
 import time
+import random
 import argparse
 from PIL import Image, ImageTk
 from typing import Dict, List, Optional, Tuple
@@ -465,12 +466,21 @@ class SnakeApp:
                     tags="walls"
                 )
 
-    def _init_snake_canvas_items(self):
-        """Создает Canvas-элементы для змейки один раз (тег 'snake')."""
+    def _init_snake_canvas_items(self) -> None:
+        """Создание Canvas-элементов для змейки (тег 'snake').
+        Начальное направление выбирается случайным образом."""
         self.snake_items = []
 
-        # Маппинг векторов в строки (вынесен для переиспользования)
-        dir_map = {(0, -1): "up", (0, 1): "down", (-1, 0): "left", (1, 0): "right"}
+        # ✅ Выбираем случайное начальное направление
+        random_dir_str = random.choice(["up", "down", "left", "right"])
+        dir_to_vector = {
+            "up": (0, -1),
+            "down": (0, 1),
+            "left": (-1, 0),
+            "right": (1, 0)
+        }
+        # ✅ Синхронизируем случайное направление с игровой логикой
+        self.game.direction = dir_to_vector[random_dir_str]
 
         for i, (x, y) in enumerate(self.game.snake):
             px, py = x * self.cell_size, y * self.cell_size
@@ -478,29 +488,36 @@ class SnakeApp:
             # Определяем тип сегмента
             if i == 0:
                 part_type = "head"
-                # ✅ Для головы берем текущее направление из логики (всегда кортеж)
-                direction_vector = self.game.direction
             elif i == len(self.game.snake) - 1:
                 part_type = "tail"
-                # ✅ Для хвоста используем дефолтный вектор (кортеж!)
-                direction_vector = (1, 0)
             else:
                 part_type = "body"
-                # ✅ Для тела используем дефолтный вектор (кортеж!)
-                direction_vector = (1, 0)
 
-            # ✅ Преобразуем вектор в строку единообразно
-            dir_str = dir_map.get(direction_vector, "right")
-            sprite_key = (dir_str, part_type)
-
+            # ✅ Для головы используем случайное направление, для остальных — дефолтное
+            direction_str = random_dir_str if i == 0 else "right"
+            sprite_key = (direction_str, part_type)
             sprite = self.snake_sprites.get(sprite_key)
 
             if sprite:
-                item = self.canvas.create_image(px, py, image=sprite, anchor=tk.NW, tags="snake")
+                item = self.canvas.create_image(
+                    px, py,
+                    image=sprite,
+                    anchor=tk.NW,
+                    tags="snake"
+                )
             else:
+                # Fallback: прямоугольник
                 color = self.theme["snake_head"] if i == 0 else self.theme["snake_body"]
-                item = self.canvas.create_rectangle(px, py, px + self.cell_size, py + self.cell_size,
-                                                    fill=color, outline=self.theme["bg"], width=1, tags="snake")
+                item = self.canvas.create_rectangle(
+                    px, py,
+                    px + self.cell_size,
+                    py + self.cell_size,
+                    fill=color,
+                    outline=self.theme["bg"],
+                    width=1,
+                    tags="snake"
+                )
+
             self.snake_items.append(item)
 
     def render(self) -> None:
