@@ -48,6 +48,9 @@ class SnakeLogic:
         return random.choice(free_cells)
 
     def _spawn_bonus(self):
+        # ✅ Если бонус уже активен — выходим, не трогаем его
+        if self.bonus is not None:
+            return
         """Создает бонус на свободном месте с защитой от бесконечного цикла."""
         free_cells = []
         for x in range(self.width):

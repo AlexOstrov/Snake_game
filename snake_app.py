@@ -3,6 +3,7 @@ from tkinter import simpledialog, messagebox
 import json
 import os
 import time
+import random
 import argparse
 from PIL import Image, ImageTk
 from snake_logic import SnakeLogic
@@ -254,14 +255,20 @@ class SnakeApp:
 
     def _init_snake_canvas_items(self):
         """Создает Canvas-элементы для змейки один раз (тег 'snake')."""
+        # ✅ Выбираем случайное направление для головы
+        directions = ["up", "down", "left", "right"]
+        random_direction = random.choice(directions)
+
+        # ✅ Синхронизируем направление в логике игры
+        dir_map = {"up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
+        self.game.direction = dir_map[random_direction]
+
         self.snake_items = []
         for i, (x, y) in enumerate(self.game.snake):
-            # При инициализации создаем любой спрайт (например, head_right),
-            # метод render() мгновенно заменит его на правильный в первом кадре.
             px, py = x * self.cell_size, y * self.cell_size
 
-            # Пробуем загрузить спрайт, иначе создаем прямоугольник
-            sprite = self.snake_sprites.get(("right", "head" if i == 0 else "body"))
+            # Для головы используем случайное направление, для тела - "right" (временное, render исправит)
+            sprite = self.snake_sprites.get((random_direction, "head" if i == 0 else "body"))
 
             if sprite:
                 item = self.canvas.create_image(px, py, image=sprite, anchor=tk.NW, tags="snake")
