@@ -1,5 +1,5 @@
 {
-  "speed": 220,
+  "speed": 120,
   "min_speed": 50,
   "width": 20,
   "height": 20,
@@ -8,5 +8,13 @@
   "theme_name": "Dark",
   "bonus_ttl": 60,
   "slow_effect_duration": 150,
-  "magnet_effect_duration": 150
+  "magnet_effect_duration": 150,
+  "magnet_radius": 3,
+  "bonus_blink_threshold": 15,
+  "slow_step_penalty": 0.04,
+  "effect_life": 30,
+  "magnet_effect_life": 25,
+  "test_effect_life": 60,
+  "bonus_spawn_chance": 0.15,
+  "wall_count": 8
 }

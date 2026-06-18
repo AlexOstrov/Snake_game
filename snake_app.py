@@ -151,15 +151,6 @@ class SnakeApp:
         (1, 0): "right"
     }
 
-    # Константы эффектов
-    SLOW_EFFECT_DURATION = 150  # тиков
-    MAGNET_EFFECT_DURATION = 150  # тиков
-    SLOW_DURATION_SECONDS = 15  # секунд (для отображения)
-    MAGNET_DURATION_SECONDS = 15  # секунд (для отображения)
-
-    # Радиус действия магнита (в клетках)
-    MAGNET_RADIUS = 3
-
     def __init__(
             self,
             root: tk.Tk,
@@ -190,11 +181,13 @@ class SnakeApp:
             self.current_theme_name = "Dark"
 
         # 2. Инициализация игровой логики
+        bonus_blink_threshold = config.get("bonus_blink_threshold", 15)
         bonus_ttl = config.get("bonus_ttl", 60)
         self.game = SnakeLogic(
             width=config["width"],
             height=config["height"],
-            bonus_ttl=bonus_ttl
+            bonus_ttl=bonus_ttl,
+            bonus_blink_threshold=bonus_blink_threshold
         )
         self.cell_size = config["cell_size"]
 
@@ -227,6 +220,15 @@ class SnakeApp:
         self.effects: List[Dict] = []
         self.slow_effect_timer = 0
         self.magnet_effect_timer = 0
+        # Параметры эффектов из конфига
+        self.slow_effect_duration = config.get("slow_effect_duration", 150)
+        self.magnet_effect_duration = config.get("magnet_effect_duration", 150)
+        self.magnet_radius = config.get("magnet_radius", 3)
+        self.bonus_blink_threshold = config.get("bonus_blink_threshold", 15)
+        self.slow_step_penalty = config.get("slow_step_penalty", 0.04)
+        self.effect_life = config.get("effect_life", 30)
+        self.magnet_effect_life = config.get("magnet_effect_life", 25)
+        self.test_effect_life = config.get("test_effect_life", 60)
 
         # 6. Анимация движения
         self.prev_positions: List[Tuple[int, int]] = [
@@ -561,7 +563,7 @@ class SnakeApp:
         distance = abs(head_x - food_x) + abs(head_y - food_y)
 
         # Если еда в радиусе действия магнита
-        if 0 < distance <= self.MAGNET_RADIUS:
+        if 0 < distance <= self.magnet_radius:
             # Двигаем еду к голове
             if food_x < head_x:
                 food_x += 1
@@ -585,7 +587,7 @@ class SnakeApp:
                     "y": head_y * self.cell_size + self.cell_size / 2,
                     "text": " +1",
                     "color": "#FF1493",
-                    "life": 25
+                    "life": self.magnet_effect_life
                 })
             else:
                 # Просто двигаем еду
@@ -618,7 +620,7 @@ class SnakeApp:
         bx, by, b_type = self.game.bonus
 
         # Проверяем, нужно ли скрыть бонус (мигание)
-        is_blinking = self.game.bonus_ttl < 15 and (self.game.bonus_ttl // 3) % 2 == 0
+        is_blinking = self.game.bonus_ttl < self.bonus_blink_threshold and (self.game.bonus_ttl // 3) % 2 == 0
 
         if not is_blinking:
             px, py = bx * self.cell_size, by * self.cell_size
@@ -821,7 +823,7 @@ class SnakeApp:
 
         # Учитываем замедление
         if self.slow_effect_timer > 0:
-            step_duration += 0.04  # Добавляем 40мс
+            step_duration += self.slow_step_penalty
 
         self.move_progress = min(self.move_progress + dt / step_duration, 1.0)
 
@@ -895,23 +897,23 @@ class SnakeApp:
                 })
 
             elif event == "eat_bonus_slow":
-                self.slow_effect_timer = self.SLOW_EFFECT_DURATION
+                self.slow_effect_timer = self.slow_effect_duration
                 self.effects.append({
                     "x": hx * self.cell_size + self.cell_size / 2,
                     "y": hy * self.cell_size + self.cell_size / 2,
                     "text": "❄️ SLOW",
                     "color": "#00BFFF",
-                    "life": 30
+                    "life": self.effect_life
                 })
 
             elif event == "eat_bonus_magnet":
-                self.magnet_effect_timer = self.MAGNET_EFFECT_DURATION
+                self.magnet_effect_timer = self.magnet_effect_duration
                 self.effects.append({
                     "x": hx * self.cell_size + self.cell_size / 2,
                     "y": hy * self.cell_size + self.cell_size / 2,
                     "text": "🧲 MAGNET",
                     "color": "#FF1493",
-                    "life": 30
+                    "life": self.effect_life
                 })
 
         # Ускорение от очков
@@ -1026,10 +1028,12 @@ class SnakeApp:
         """Перезапуск игры."""
         # Пересоздаём логику
         bonus_ttl = self.config.get("bonus_ttl", 60)
+        bonus_blink_threshold = self.config.get("bonus_blink_threshold", 15)
         self.game = SnakeLogic(
             self.config["width"],
             self.config["height"],
-            bonus_ttl=bonus_ttl
+            bonus_ttl=bonus_ttl,
+            bonus_blink_threshold=bonus_blink_threshold
         )
 
         # Сброс состояния
@@ -1159,7 +1163,7 @@ class SnakeApp:
                 "y": hy * self.cell_size + self.cell_size / 2,
                 "text": " +5 (TEST)",
                 "color": "#FFD700",
-                "life": 60
+                "life": self.test_effect_life
             })
             self._spawn_test_bonus_on_field("gold")
 

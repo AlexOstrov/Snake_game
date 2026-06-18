@@ -47,7 +47,8 @@ class SnakeLogic:
             height: int = 20,
             bonus_ttl: int = 50,
             wall_count: int = 8,
-            bonus_spawn_chance: float = 0.15
+            bonus_spawn_chance: float = 0.15,
+            bonus_blink_threshold: int = 15
     ):
         """
         Инициализация игровой логики.
@@ -64,6 +65,7 @@ class SnakeLogic:
         self.bonus_ttl_default = bonus_ttl
         self.wall_count = wall_count
         self.bonus_spawn_chance = bonus_spawn_chance
+        self.bonus_blink_threshold = bonus_blink_threshold
 
         # Инициализация змейки в центре поля
         self.snake: List[Tuple[int, int]] = [(width // 2, height // 2)]
