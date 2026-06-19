@@ -211,7 +211,7 @@ class SnakeApp:
         # 4. Менеджеры
         self.sound = SoundManager()
         self.scores = ScoreManager()
-        self.achievements = AchievementsManager()
+        self.achievements = AchievementsManager(player_name)
 
         # 5. Состояние игры
         self.is_paused = False
@@ -1110,38 +1110,32 @@ class SnakeApp:
             self.toast_label.destroy()
             self.toast_label = None
 
-    def show_achievements(self) -> None:
-        """Открыть окно со списком достижений."""
+    def show_achievements(self):
         win = tk.Toplevel(self.root)
-        win.title(" Достижения")
-        win.geometry("320x420")
+        win.title("🏆 Достижения")
+        win.geometry("350x450")
         win.config(bg="#1e1e1e")
         win.transient(self.root)
         win.grab_set()
 
-        tk.Label(
-            win,
-            text="Ваши трофеи:",
-            bg="#1e1e1e",
-            fg="#fff",
-            font=("Arial", 12, "bold")
-        ).pack(pady=10)
+        # ✅ Заголовок с именем игрока
+        tk.Label(win, text=f"Ваши трофеи: {self.player_name}",
+                 bg="#1e1e1e", fg="#ffd700", font=("Arial", 12, "bold")).pack(pady=10)
+
+        # Счётчик разблокированных достижений
+        unlocked_count = sum(1 for a in self.achievements.achievements.values() if a.unlocked)
+        total_count = len(self.achievements.achievements)
+        tk.Label(win, text=f"Разблокировано: {unlocked_count} / {total_count}",
+                 bg="#1e1e1e", fg="#aaaaaa", font=("Arial", 10)).pack(pady=(0, 10))
 
         frame = tk.Frame(win, bg="#1e1e1e")
         frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
         for ach in self.achievements.achievements.values():
-            status = "✅" if ach.unlocked else "🔒"
+            status = "✅" if ach.unlocked else ""
             color = "#00ff00" if ach.unlocked else "#666666"
-            tk.Label(
-                frame,
-                text=f"{status} {ach.icon} {ach.name}\n   {ach.desc}",
-                bg="#1e1e1e",
-                fg=color,
-                justify=tk.LEFT,
-                anchor="w",
-                pady=6
-            ).pack(fill=tk.X)
+            tk.Label(frame, text=f"{status} {ach.icon} {ach.name}\n   {ach.desc}",
+                     bg="#1e1e1e", fg=color, justify=tk.LEFT, anchor="w", pady=6).pack(fill=tk.X)
 
     def _activate_test_event(self) -> None:
         """Активация тестового бонуса (если указан через --event)."""
