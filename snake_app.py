@@ -852,24 +852,24 @@ class SnakeApp:
     def _handle_step_event(self, event: str) -> None:
         """
         Обработка событий игрового шага.
-
-        Args:
-            event: Тип события ("eat", "die", "eat_bonus_*")
         """
         if event == "eat":
             self.sound.play("eat")
+            # ✅ Обновляем UI в реальном времени (счёт, длина, марафонец)
+            self._update_live_stats()
 
         elif event == "die":
             self.sound.play("gameover")
-            self.achievements.update_score(self.player_name, self.game.score)
-            self._update_leaderboard_ui()
+            # Финальное обновление статистики при смерти
             self.achievements.update_session_end(
                 self.game.score,
                 len(self.game.snake),
                 self.session_bonuses
             )
+            # Финальная проверка достижений
             for ach in self.achievements.check_new_unlocks():
                 self._show_achievement_toast(f"{ach.icon} {ach.name}", ach.desc)
+            self._update_leaderboard_ui()
 
         elif event in ("eat_bonus_gold", "eat_bonus_slow", "eat_bonus_magnet"):
             self.sound.play("eat")
@@ -892,7 +892,7 @@ class SnakeApp:
                     "y": hy * self.cell_size + self.cell_size / 2,
                     "text": "❄️ SLOW",
                     "color": "#00BFFF",
-                    "life": self.effect_life
+                    "life": 30
                 })
 
             elif event == "eat_bonus_magnet":
@@ -902,8 +902,11 @@ class SnakeApp:
                     "y": hy * self.cell_size + self.cell_size / 2,
                     "text": "🧲 MAGNET",
                     "color": "#FF1493",
-                    "life": self.effect_life
+                    "life": 30
                 })
+
+            # ✅ Обновляем UI в реальном времени (бонусы, охотник за бонусами, первая кровь)
+            self._update_live_stats()
 
         # Ускорение от очков
         self.current_delay = max(
@@ -1091,6 +1094,25 @@ class SnakeApp:
         self._init_snake_canvas_items()
 
         self.update_info()
+        self._update_leaderboard_ui()
+
+    def _update_live_stats(self) -> None:
+        """
+        Обновляет статистику, проверяет достижения и обновляет UI
+        в реальном времени во время игры.
+        """
+        # 1. Обновляем live-статистику (max_score, max_length, session_bonuses)
+        self.achievements.update_live_stats(
+            self.game.score,
+            len(self.game.snake),
+            self.session_bonuses
+        )
+
+        # 2. Проверяем новые достижения (сразу показываем тосты)
+        for ach in self.achievements.check_new_unlocks():
+            self._show_achievement_toast(f"{ach.icon} {ach.name}", ach.desc)
+
+        # 3. Обновляем панель лидеров и достижений
         self._update_leaderboard_ui()
 
     def update_info(self) -> None:

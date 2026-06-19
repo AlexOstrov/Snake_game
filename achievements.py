@@ -156,6 +156,35 @@ class AchievementsManager:
         self.stats["games_played"] += 1
         self._save()
 
+    def update_live_stats(
+            self, score: int, length: int, session_bonuses: int
+    ) -> None:
+        """
+        Обновляет статистику игрока в реальном времени во время игры.
+
+        В отличие от update_session_end():
+        - НЕ увеличивает games_played (игра ещё не завершена)
+        - НЕ добавляет session_bonuses к total_bonuses (это будет сделано в конце)
+        - Сохраняет изменения на диск, чтобы таблица лидеров обновлялась
+        """
+        updated = False
+
+        # Обновляем лучший счёт, если текущий выше
+        if score > self.stats.get("max_score", 0):
+            self.stats["max_score"] = score
+            updated = True
+
+        # Обновляем максимальную длину змейки
+        if length > self.stats.get("max_length", 1):
+            self.stats["max_length"] = length
+            updated = True
+
+        # Обновляем бонусы текущей сессии (для ачивки bonuses_hunter)
+        self.stats["session_bonuses"] = session_bonuses
+
+        if updated:
+            self._save()
+
     def check_new_unlocks(self) -> list[Achievement]:
         """Проверяет условия и возвращает список только что открытых достижений."""
         new_unlocks = []
