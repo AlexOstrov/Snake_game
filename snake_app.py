@@ -22,7 +22,6 @@ from typing import Dict, List, Optional, Tuple
 
 from snake_logic import SnakeLogic
 from sound_manager import SoundManager
-from score_manager import ScoreManager
 from achievements import AchievementsManager
 
 
@@ -210,7 +209,6 @@ class SnakeApp:
 
         # 4. Менеджеры
         self.sound = SoundManager()
-        self.scores = ScoreManager()
         self.achievements = AchievementsManager(player_name)
 
         # 5. Состояние игры
@@ -872,7 +870,7 @@ class SnakeApp:
 
         elif event == "die":
             self.sound.play("gameover")
-            self.scores.update_score(self.player_name, self.game.score)
+            self.achievements.update_score(self.player_name, self.game.score)
             self._update_leaderboard_ui()
             self.achievements.update_session_end(
                 self.game.score,
@@ -970,7 +968,7 @@ class SnakeApp:
     def _update_leaderboard_ui(self) -> None:
         """Обновление списка лидеров в интерфейсе."""
         self.lb_listbox.delete(0, tk.END)
-        top = self.scores.get_leaderboard(10)
+        top = self.achievements.get_leaderboard(10)
 
         if not top:
             self.lb_listbox.insert(tk.END, "Нет данных")
@@ -1064,7 +1062,7 @@ class SnakeApp:
 
     def update_info(self) -> None:
         """Обновление информационной метки."""
-        best = self.scores.get_best_score(self.player_name)
+        best = self.achievements.get_best_score(self.player_name)
         status = " | GAME OVER | R - рестарт" if self.game.game_over else ""
         pause_text = " | ⏸ ПАУЗА" if self.is_paused else ""
 

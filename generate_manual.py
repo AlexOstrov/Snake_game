@@ -201,11 +201,10 @@ def generate_markdown(config: dict, sprites: list) -> str:
     h3("Структура проекта")
     code("""snake_game/
 ├── snake_app.py          # Главный модуль (UI + игровой цикл)
-── snake_logic.py        # Игровая логика
+├── snake_logic.py        # Игровая логика
 ├── sound_manager.py      # Звуковые эффекты
-├── score_manager.py      # Таблица лидеров
-── achievements.py       # Система достижений
-── config.json           # Конфигурация
+├── achievements.py       # Система достижений
+├── config.json           # Конфигурация
 ├── assets/               # Спрайты (PNG 25x25)
 │   ├── snake_head_*.png
 │   ├── snake_body_*.png
@@ -328,7 +327,7 @@ def generate_markdown(config: dict, sprites: list) -> str:
 
     # ---------------- 10. Таблица лидеров ----------------
     h2("10. Таблица лидеров")
-    p("Рекорды сохраняются в файл `scores.json` в формате JSON.")
+    p("Рекорды сохраняются в файл `achievements.json` в формате JSON.")
     p("Топ-3 игрока отмечаются медалями:  🥈 🥉.")
     p("При завершении игры результат сравнивается с таблицей и обновляется, "
       "если он лучше предыдущего рекорда этого игрока.")
@@ -383,7 +382,6 @@ def generate_markdown(config: dict, sprites: list) -> str:
         [
             ["Нет звука", "Проверьте настройки звука ОС"],
             ["Игра лагает", "Увеличьте `speed` в config.json"],
-            ["Сброс рекордов", "Удалите `scores.json` — он создастся заново"],
             ["Не запускается", "Установите Python 3.8+ и `pip install Pillow`"],
             ["Змейка не отображается", "Проверьте наличие PNG в `assets/`"],
             ["Ошибка `TclError: wrong # coordinates`", "Обновите `snake_app.py` до актуальной версии"],
@@ -405,7 +403,7 @@ def generate_markdown(config: dict, sprites: list) -> str:
             ["Частота рендера", "~60 FPS (интерполяция)"],
             ["Логический шаг", "120 мс (ускоряется до 50 мс)"],
             ["Таблица лидеров", "Топ-10 игроков"],
-            ["Хранение данных", "JSON-файлы (scores.json, achievements.json, config.json)"],
+            ["Хранение данных", "JSON-файлы (achievements.json, config.json)"],
         ],
     )
     lines.append("")

@@ -176,3 +176,44 @@ class AchievementsManager:
     def get_all_players(self) -> list[str]:
         """Возвращает список всех игроков (для возможного UI)."""
         return list(self.all_players_data.keys())
+
+    def update_score(self, player_name: str, score: int) -> None:
+        """
+        Обновляет лучший счёт игрока.
+        Аналог ScoreManager.update_score().
+        """
+        if player_name not in self.all_players_data:
+            self.all_players_data[player_name] = {
+                "unlocked": [],
+                "stats": self._default_stats(),
+            }
+
+        player_data = self.all_players_data[player_name]
+        current_best = player_data["stats"].get("max_score", 0)
+
+        if score > current_best:
+            player_data["stats"]["max_score"] = score
+            self._save()
+
+    def get_leaderboard(self, limit: int = 10) -> list:
+        """
+        Возвращает список топ-игроков [(name, score), ...].
+        Аналог ScoreManager.get_leaderboard().
+        """
+        players_scores = []
+        for name, data in self.all_players_data.items():
+            score = data.get("stats", {}).get("max_score", 0)
+            players_scores.append((name, score))
+
+        # Сортировка по убыванию счёта
+        players_scores.sort(key=lambda x: x[1], reverse=True)
+        return players_scores[:limit]
+
+    def get_best_score(self, player_name: str) -> int:
+        """
+        Возвращает лучший счёт игрока.
+        Аналог ScoreManager.get_best_score().
+        """
+        if player_name in self.all_players_data:
+            return self.all_players_data[player_name].get("stats", {}).get("max_score", 0)
+        return 0

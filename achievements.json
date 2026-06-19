@@ -3,13 +3,15 @@
     "Test": {
       "unlocked": [
         "first_blood",
-        "bonuses_hunter"
+        "bonuses_hunter",
+        "speed_demon",
+        "veteran"
       ],
       "stats": {
-        "max_score": 24,
-        "max_length": 18,
-        "total_bonuses": 4,
-        "games_played": 1,
+        "max_score": 35,
+        "max_length": 23,
+        "total_bonuses": 15,
+        "games_played": 5,
         "session_bonuses": 4
       }
     }
