@@ -219,10 +219,10 @@ def generate_markdown(config: dict, sprites: list) -> str:
 """)
 
     h3("Запуск игры")
-    code("python snake_app.py")
+    p("`python snake_app.py`")
 
     h3("Запуск с тестовым бонусом")
-    code("python snake_app.py --event eat_bonus_magnet")
+    p("`python snake_app.py --event eat_bonus_magnet`")
     p("Допустимые значения `--event`: `eat_bonus_gold`, `eat_bonus_slow`, `eat_bonus_magnet`.")
     lines.append("")
 
@@ -477,6 +477,8 @@ def generate_pdf(markdown_text: str, output_path: str, font_name: str, sprites: 
     )
 
     styles = getSampleStyleSheet()
+
+    # Стили с поддержкой кириллицы
     title_style = ParagraphStyle(
         "CustomTitle", parent=styles["Heading1"], fontSize=22,
         textColor=colors.darkgreen, spaceAfter=20, alignment=TA_CENTER,
@@ -501,11 +503,17 @@ def generate_pdf(markdown_text: str, output_path: str, font_name: str, sprites: 
         "Code", parent=styles["Normal"], fontSize=9,
         textColor=colors.darkblue, backColor=colors.lightgrey,
         spaceAfter=8, spaceBefore=4, fontName=font_name, leading=11,
+        leftIndent=10, rightIndent=10,
+    )
+    table_cell_style = ParagraphStyle(
+        "TableCell", parent=styles["Normal"], fontSize=9,
+        textColor=colors.black, fontName=font_name, leading=11,
+        alignment=TA_LEFT,
     )
 
     story = []
 
-    # Титул
+    # Титул (без emoji)
     story.append(Paragraph("SNAKE GAME", title_style))
     story.append(Paragraph("Руководство пользователя", ParagraphStyle(
         "Sub", parent=styles["Heading2"], fontSize=16,
@@ -514,73 +522,204 @@ def generate_pdf(markdown_text: str, output_path: str, font_name: str, sprites: 
     )))
     story.append(Spacer(1, 1 * cm))
 
-    # Парсим markdown построчно (упрощённо)
+    # Парсим markdown построчно
     in_code_block = False
     code_buffer = []
 
-    for raw_line in markdown_text.split("\n"):
-        line = raw_line.strip()
+    # Буферы для таблиц
+    current_table_rows = []
+    current_table_cols = 0
 
-        # Блоки кода
-        if line.startswith("```"):
-            if in_code_block:
-                story.append(Paragraph("\n".join(code_buffer), code_style))
-                code_buffer = []
-                in_code_block = False
+    def wrap_text(text, max_width=40):
+        """Разбивает текст на строки для переноса."""
+        words = text.split()
+        lines = []
+        current_line = ""
+        for word in words:
+            if len(current_line) + len(word) + 1 <= max_width:
+                current_line += (" " if current_line else "") + word
             else:
-                in_code_block = True
-            continue
-        if in_code_block:
-            code_buffer.append(raw_line)
-            continue
+                if current_line:
+                    lines.append(current_line)
+                current_line = word
+        if current_line:
+            lines.append(current_line)
+        return "<br/>".join(lines)
 
-        if not line:
-            story.append(Spacer(1, 0.2 * cm))
-            continue
+    def flush_table():
+        """Добавляет накопленную таблицу в документ и очищает буфер."""
+        nonlocal current_table_rows, current_table_cols
+        if current_table_rows:
+            wrapped_data = []
+            for row in current_table_rows:
+                wrapped_row = []
+                for cell in row:
+                    if isinstance(cell, str):
+                        wrapped_text = wrap_text(cell, max_width=35)
+                        wrapped_row.append(Paragraph(wrapped_text, table_cell_style))
+                    else:
+                        wrapped_row.append(cell)
+                wrapped_data.append(wrapped_row)
 
-        if line.startswith("# "):
-            story.append(Paragraph(line[2:], title_style))
-        elif line.startswith("## "):
-            story.append(Paragraph(line[3:], h2_style))
-        elif line.startswith("### "):
-            story.append(Paragraph(line[4:], h3_style))
-        elif line.startswith("- "):
-            story.append(Paragraph("• " + line[2:], body_style))
-        elif line.startswith("| ") and " | " in line:
-            # Таблица
-            cells = [c.strip() for c in line.split("|")[1:-1]]
-            if "---" in cells[0]:
-                continue  # разделитель
-            t = Table([cells], colWidths=[4 * cm, 4 * cm, 4 * cm, 4 * cm])
+            # Определяем ширину колонок динамически
+            num_cols = len(current_table_rows[0]) if current_table_rows else 1
+            if num_cols == 2:
+                col_widths = [5 * cm, 10 * cm]
+            elif num_cols == 3:
+                col_widths = [4 * cm, 5 * cm, 6 * cm]
+            elif num_cols == 4:
+                col_widths = [3.5 * cm, 3.5 * cm, 3.5 * cm, 4 * cm]
+            else:
+                col_widths = [4 * cm] * num_cols
+
+            t = Table(wrapped_data, colWidths=col_widths)
             t.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
                 ("FONTNAME", (0, 0), (-1, -1), font_name),
                 ("FONTSIZE", (0, 0), (-1, -1), 9),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
             ]))
             story.append(t)
+            story.append(Spacer(1, 0.3 * cm))
+
+        current_table_rows = []
+        current_table_cols = 0
+
+    def flush_code():
+        """Добавляет накопленный блок кода в документ."""
+        nonlocal in_code_block, code_buffer
+        if in_code_block and code_buffer:
+            code_text = "\n".join(code_buffer).replace("`", "").strip()
+            if code_text:
+                story.append(Paragraph(code_text, code_style))
+            code_buffer = []
+            in_code_block = False
+
+    for raw_line in markdown_text.split("\n"):
+        line = raw_line.strip()
+
+        # --- Обработка блоков кода ---
+        if line.startswith("```"):
+            if in_code_block:
+                flush_code()
+            else:
+                in_code_block = True
+                # Если перед блоком кода была таблица, завершаем её
+                flush_table()
+            continue
+
+        if in_code_block:
+            # Пустые строки внутри кода сохраняем как пробелы, чтобы не прерывать блок
+            if not line:
+                code_buffer.append("")
+            else:
+                code_buffer.append(line)
+            continue
+
+        # Пропускаем пустые строки (они служат разделителями)
+        if not line:
+            # Пустая строка может означать конец таблицы
+            flush_table()
+            story.append(Spacer(1, 0.2 * cm))
+            continue
+
+        # Заголовки
+        if line.startswith("# "):
+            flush_table();
+            flush_code()
+            text = line[2:].replace("🐍", "").replace("📑", "").replace("📦", "").strip()
+            story.append(Paragraph(text, title_style))
+        elif line.startswith("## "):
+            flush_table();
+            flush_code()
+            text = line[3:].replace("🐍", "").replace("📑", "").replace("📦", "").strip()
+            story.append(Paragraph(text, h2_style))
+        elif line.startswith("### "):
+            flush_table();
+            flush_code()
+            text = line[4:].replace("🐍", "").replace("📑", "").replace("📦", "").strip()
+            story.append(Paragraph(text, h3_style))
+
+        # Маркированный список
+        elif line.startswith("- "):
+            flush_table();
+            flush_code()
+            text = line[2:].replace("✓", "").replace("•", "").strip()
+            story.append(Paragraph("• " + text, body_style))
+
+        # Таблицы
+        elif line.startswith("| ") and " | " in line:
+            cells = [c.strip() for c in line.split("|")[1:-1]]
+            # Пропускаем строки-разделители (---|---)
+            if "---" in cells[0] or all("-" in c for c in cells):
+                continue
+
+                # Если это первая строка новой таблицы, запоминаем кол-во колонок
+            if not current_table_rows:
+                current_table_cols = len(cells)
+
+            # Добавляем строку только если количество ячеек совпадает с первой строкой
+            if len(cells) == current_table_cols:
+                current_table_rows.append(cells)
+            else:
+                # Если структура нарушена, сбрасываем старую таблицу и начинаем новую
+                flush_table()
+                current_table_cols = len(cells)
+                current_table_rows.append(cells)
+
+        # Горизонтальный разделитель
         elif line.startswith("---"):
+            flush_table(); flush_code()
             story.append(Spacer(1, 0.5 * cm))
+
+        # Обычный текст
         else:
-            # Убираем markdown-разметку
+            flush_table(); flush_code()
             clean = line.replace("**", "").replace("_", "").replace("`", "")
+            # Замена emoji на текст для PDF (сохраняем доработку без [Gold])
+            replacements = {
+                "🥇": "[Gold]", "❄️": "[Slow]", "🧲": "[Magnet]",
+                "⏸": "[Pause]", "🏆": "[Trophy]", "🎨": "[Theme]",
+                "⚠️": "[Warning]", "✅": "[OK]", "❌": "[Error]"
+            }
+            for emoji, txt in replacements.items():
+                clean = clean.replace(emoji, txt)
+
+            # Безопасное удаление остальных неизвестных эмодзи/символов
+            safe_chars = []
+            for char in clean:
+                cp = ord(char)
+                # Разрешаем: латиницу, кириллицу, цифры, пробелы и базовую пунктуацию
+                if (cp < 128) or (0x0400 <= cp <= 0x04FF) or (0x00C0 <= cp <= 0x024F):
+                    safe_chars.append(char)
+            clean = "".join(safe_chars)
+
             story.append(Paragraph(clean, body_style))
+
+    # Финальный сброс буферов
+    flush_table()
+    flush_code()
 
     # Добавляем изображения спрайтов
     story.append(PageBreak())
-    story.append(Paragraph("📦 Галерея спрайтов", h2_style))
+    story.append(Paragraph("Галерея спрайтов", h2_style))
     story.append(Spacer(1, 0.5 * cm))
 
     sprite_rows = []
-    for sprite in sprites:
+    for sprite in sprites[:10]:
         path = os.path.join(ASSETS_DIR, sprite)
         if os.path.exists(path):
             try:
                 img = RLImage(path, width=1.5 * cm, height=1.5 * cm)
-                sprite_rows.append([img, _describe_sprite(sprite)])
+                desc = _describe_sprite(sprite).replace("🥇", "").replace("❄️", "").replace("🧲", "")
+                sprite_rows.append([img, Paragraph(desc, table_cell_style)])
             except Exception:
-                sprite_rows.append([sprite, _describe_sprite(sprite)])
+                sprite_rows.append([sprite, Paragraph(_describe_sprite(sprite), table_cell_style)])
 
     if sprite_rows:
         t = Table(sprite_rows, colWidths=[2 * cm, 14 * cm])
@@ -589,18 +728,26 @@ def generate_pdf(markdown_text: str, output_path: str, font_name: str, sprites: 
             ("GRID", (0, 0), (-1, -1), 0.3, colors.lightgrey),
             ("FONTNAME", (1, 0), (1, -1), font_name),
             ("FONTSIZE", (1, 0), (1, -1), 9),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
         ]))
         story.append(t)
 
     story.append(Spacer(1, 1 * cm))
-    story.append(Paragraph("Приятной игры! 🐍", ParagraphStyle(
+    story.append(Paragraph("Приятной игры!", ParagraphStyle(
         "Footer", parent=styles["Normal"], fontSize=12,
         textColor=colors.darkgreen, alignment=TA_CENTER,
         fontName=font_name,
     )))
 
-    doc.build(story)
-    return True
+    try:
+        doc.build(story)
+        return True
+    except Exception as e:
+        print(f"Ошибка при построении PDF: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 
 # ---------------------------------------------------------------------------
