@@ -174,13 +174,12 @@ class AchievementsManager:
         self.stats["session_bonuses"] = 0
 
     def get_all_players(self) -> list[str]:
-        """Возвращает список всех игроков (для возможного UI)."""
+        """Возвращает список всех игроков."""
         return list(self.all_players_data.keys())
 
     def update_score(self, player_name: str, score: int) -> None:
         """
         Обновляет лучший счёт игрока.
-        Аналог ScoreManager.update_score().
         """
         if player_name not in self.all_players_data:
             self.all_players_data[player_name] = {
@@ -198,7 +197,6 @@ class AchievementsManager:
     def get_leaderboard(self, limit: int = 10) -> list:
         """
         Возвращает список топ-игроков [(name, score), ...].
-        Аналог ScoreManager.get_leaderboard().
         """
         players_scores = []
         for name, data in self.all_players_data.items():
@@ -212,7 +210,6 @@ class AchievementsManager:
     def get_best_score(self, player_name: str) -> int:
         """
         Возвращает лучший счёт игрока.
-        Аналог ScoreManager.get_best_score().
         """
         if player_name in self.all_players_data:
             return self.all_players_data[player_name].get("stats", {}).get("max_score", 0)
