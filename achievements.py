@@ -1,62 +1,154 @@
+"""
+Менеджер системы достижений (ачивок).
+Хранит прогресс каждого игрока отдельно в файле achievements.json.
+"""
 import json
 import os
 
+
 class Achievement:
-    def __init__(self, ach_id, name, desc, icon, condition):
+    """Представление одного достижения."""
+
+    def __init__(self, ach_id: str, name: str, desc: str, icon: str, condition):
         self.id = ach_id
         self.name = name
         self.desc = desc
         self.icon = icon
-        self.condition = condition  # lambda, принимающая dict stats
+        self.condition = condition  # lambda(stats) -> bool
         self.unlocked = False
 
+
 class AchievementsManager:
-    def __init__(self, save_path="achievements.json"):
+    """
+    Управляет достижениями для конкретного игрока.
+    Данные хранятся в формате:
+    {
+        "players": {
+            "PlayerName": {
+                "unlocked": ["first_blood", ...],
+                "stats": {"max_score": 0, ...}
+            }
+        }
+    }
+    """
+
+    def __init__(self, player_name: str, save_path: str = "achievements.json"):
         self.save_path = save_path
-        self.achievements = {}
-        # Глобальная статистика игрока
-        self.stats = {
+        self.player_name = player_name
+        self.achievements: dict[str, Achievement] = {}
+        self.all_players_data: dict = {}
+        self.unlocked_ids: list[str] = []
+        self.stats: dict = self._default_stats()
+
+        self._load()
+        self._init_achievements()
+
+        # Если игрока нет в базе — создаём запись
+        if self.player_name not in self.all_players_data:
+            self.all_players_data[self.player_name] = {
+                "unlocked": [],
+                "stats": self._default_stats(),
+            }
+            self._save()
+
+        # Получаем данные текущего игрока
+        self.player_data = self.all_players_data[self.player_name]
+        self.unlocked_ids = list(self.player_data.get("unlocked", []))
+        self.stats = dict(self.player_data.get("stats", self._default_stats()))
+
+        # Применяем статус разблокировки к достижениям
+        for ach in self.achievements.values():
+            if ach.id in self.unlocked_ids:
+                ach.unlocked = True
+
+    @staticmethod
+    def _default_stats() -> dict:
+        """Структура статистики по умолчанию."""
+        return {
             "max_score": 0,
             "max_length": 1,
             "total_bonuses": 0,
             "games_played": 0,
-            "session_bonuses": 0  # Сбрасывается каждую игру
+            "session_bonuses": 0,
         }
-        self.unlocked_ids = []
-        self._load()
-        self._init_achievements()
 
-    def _init_achievements(self):
-        # Формат: ключ: (id, имя, описание, иконка, условие)
+    def _init_achievements(self) -> None:
+        """Инициализирует список доступных достижений."""
         defs = {
-            "first_blood": ("first_blood", "Первая кровь", "Съешьте первый бонус", "", lambda s: s["total_bonuses"] >= 1),
-            "speed_demon": ("speed_demon", "Демон скорости", "Наберите 30 очков за игру", "", lambda s: s["max_score"] >= 30),
-            "marathon": ("marathon", "Марафонец", "Змейка вырастет до 30 сегментов", "", lambda s: s["max_length"] >= 30),
-            "bonuses_hunter": ("bonuses_hunter", "Охотник за бонусами", "Съешьте 3 бонуса за одну игру", "", lambda s: s["session_bonuses"] >= 3),
-            "veteran": ("veteran", "Ветеран", "Завершите 5 игр", "🎖️", lambda s: s["games_played"] >= 5)
+            "first_blood": (
+                "first_blood",
+                "Первая кровь",
+                "Съешьте первый бонус",
+                "",
+                lambda s: s["total_bonuses"] >= 1,
+            ),
+            "speed_demon": (
+                "speed_demon",
+                "Демон скорости",
+                "Наберите 30 очков за игру",
+                "",
+                lambda s: s["max_score"] >= 30,
+            ),
+            "marathon": (
+                "marathon",
+                "Марафонец",
+                "Змейка вырастет до 30 сегментов",
+                "",
+                lambda s: s["max_length"] >= 30,
+            ),
+            "bonuses_hunter": (
+                "bonuses_hunter",
+                "Охотник за бонусами",
+                "Съешьте 3 бонуса за одну игру",
+                "",
+                lambda s: s["session_bonuses"] >= 3,
+            ),
+            "veteran": (
+                "veteran",
+                "Ветеран",
+                "Завершите 5 игр",
+                "🎖️",
+                lambda s: s["games_played"] >= 5,
+            ),
         }
         for key, (aid, name, desc, icon, cond) in defs.items():
             self.achievements[key] = Achievement(aid, name, desc, icon, cond)
-            if aid in self.unlocked_ids:
-                self.achievements[key].unlocked = True
 
-    def _load(self):
-        if os.path.exists(self.save_path):
-            try:
-                with open(self.save_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    self.unlocked_ids = data.get("unlocked", [])
-                    self.stats.update(data.get("stats", {}))
-            except Exception:
-                pass
+    def _load(self) -> None:
+        """Загружает данные из файла. Если структура неверная — начинает с чистого листа."""
+        if not os.path.exists(self.save_path):
+            self.all_players_data = {}
+            return
 
-    def _save(self):
-        data = {"unlocked": self.unlocked_ids, "stats": self.stats}
-        with open(self.save_path, 'w', encoding='utf-8') as f:
+        try:
+            with open(self.save_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            # Принимаем только корректный формат с ключом "players"
+            if isinstance(data, dict) and "players" in data:
+                self.all_players_data = data["players"]
+            else:
+                # Устаревший или повреждённый формат — игнорируем
+                print(f"⚠️ Файл {self.save_path} имеет устаревший формат. Начинаем с чистого листа.")
+                self.all_players_data = {}
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"⚠️ Ошибка чтения {self.save_path}: {e}. Начинаем с чистого листа.")
+            self.all_players_data = {}
+
+    def _save(self) -> None:
+        """Сохраняет данные текущего игрока в файл."""
+        self.all_players_data[self.player_name] = {
+            "unlocked": self.unlocked_ids,
+            "stats": self.stats,
+        }
+        data = {"players": self.all_players_data}
+        with open(self.save_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
-    def update_session_end(self, score, length, bonuses_eaten):
-        """Вызывается при Game Over для обновления статистики."""
+    def update_session_end(
+        self, score: int, length: int, bonuses_eaten: int
+    ) -> None:
+        """Вызывается при Game Over для обновления статистики текущего игрока."""
         self.stats["max_score"] = max(self.stats["max_score"], score)
         self.stats["max_length"] = max(self.stats["max_length"], length)
         self.stats["total_bonuses"] += bonuses_eaten
@@ -64,17 +156,90 @@ class AchievementsManager:
         self.stats["games_played"] += 1
         self._save()
 
-    def check_new_unlocks(self):
+    def update_live_stats(
+            self, score: int, length: int, session_bonuses: int
+    ) -> None:
+        """
+        Обновляет статистику игрока в реальном времени во время игры.
+
+        В отличие от update_session_end():
+        - НЕ увеличивает games_played (игра ещё не завершена)
+        - НЕ добавляет session_bonuses к total_bonuses (это будет сделано в конце)
+        - Сохраняет изменения на диск, чтобы таблица лидеров обновлялась
+        """
+        updated = False
+
+        # Обновляем лучший счёт, если текущий выше
+        if score > self.stats.get("max_score", 0):
+            self.stats["max_score"] = score
+            updated = True
+
+        # Обновляем максимальную длину змейки
+        if length > self.stats.get("max_length", 1):
+            self.stats["max_length"] = length
+            updated = True
+
+        # Обновляем бонусы текущей сессии (для ачивки bonuses_hunter)
+        self.stats["session_bonuses"] = session_bonuses
+
+        if updated:
+            self._save()
+
+    def check_new_unlocks(self) -> list[Achievement]:
         """Проверяет условия и возвращает список только что открытых достижений."""
         new_unlocks = []
         for ach in self.achievements.values():
             if not ach.unlocked and ach.condition(self.stats):
                 ach.unlocked = True
-                self.unlocked_ids.append(ach.id)
+                if ach.id not in self.unlocked_ids:
+                    self.unlocked_ids.append(ach.id)
                 new_unlocks.append(ach)
         if new_unlocks:
             self._save()
         return new_unlocks
 
-    def reset_session(self):
+    def reset_session(self) -> None:
+        """Сбрасывает статистику текущей сессии (вызывается при рестарте игры)."""
         self.stats["session_bonuses"] = 0
+
+    def get_all_players(self) -> list[str]:
+        """Возвращает список всех игроков."""
+        return list(self.all_players_data.keys())
+
+    def update_score(self, player_name: str, score: int) -> None:
+        """
+        Обновляет лучший счёт игрока.
+        """
+        if player_name not in self.all_players_data:
+            self.all_players_data[player_name] = {
+                "unlocked": [],
+                "stats": self._default_stats(),
+            }
+
+        player_data = self.all_players_data[player_name]
+        current_best = player_data["stats"].get("max_score", 0)
+
+        if score > current_best:
+            player_data["stats"]["max_score"] = score
+            self._save()
+
+    def get_leaderboard(self, limit: int = 10) -> list:
+        """
+        Возвращает список топ-игроков [(name, score), ...].
+        """
+        players_scores = []
+        for name, data in self.all_players_data.items():
+            score = data.get("stats", {}).get("max_score", 0)
+            players_scores.append((name, score))
+
+        # Сортировка по убыванию счёта
+        players_scores.sort(key=lambda x: x[1], reverse=True)
+        return players_scores[:limit]
+
+    def get_best_score(self, player_name: str) -> int:
+        """
+        Возвращает лучший счёт игрока.
+        """
+        if player_name in self.all_players_data:
+            return self.all_players_data[player_name].get("stats", {}).get("max_score", 0)
+        return 0

@@ -1,16 +1,36 @@
 {
-  "unlocked": [
-    "first_blood",
-    "speed_demon",
-    "marathon",
-    "bonuses_hunter",
-    "veteran"
-  ],
-  "stats": {
-    "max_score": 49,
-    "max_length": 99,
-    "total_bonuses": 68,
-    "games_played": 52,
-    "session_bonuses": 1
+  "players": {
+    "Test": {
+      "unlocked": [
+        "first_blood",
+        "bonuses_hunter",
+        "speed_demon",
+        "veteran",
+        "marathon"
+      ],
+      "stats": {
+        "max_score": 35,
+        "max_length": 30,
+        "total_bonuses": 17,
+        "games_played": 6,
+        "session_bonuses": 2
+      }
+    },
+    "Ostrov": {
+      "unlocked": [
+        "first_blood",
+        "bonuses_hunter",
+        "speed_demon",
+        "marathon",
+        "veteran"
+      ],
+      "stats": {
+        "max_score": 39,
+        "max_length": 32,
+        "total_bonuses": 18,
+        "games_played": 9,
+        "session_bonuses": 3
+      }
+    }
   }
 }

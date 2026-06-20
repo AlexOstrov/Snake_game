@@ -22,7 +22,6 @@ from typing import Dict, List, Optional, Tuple
 
 from snake_logic import SnakeLogic
 from sound_manager import SoundManager
-from score_manager import ScoreManager
 from achievements import AchievementsManager
 
 
@@ -210,8 +209,7 @@ class SnakeApp:
 
         # 4. Менеджеры
         self.sound = SoundManager()
-        self.scores = ScoreManager()
-        self.achievements = AchievementsManager()
+        self.achievements = AchievementsManager(player_name)
 
         # 5. Состояние игры
         self.is_paused = False
@@ -270,7 +268,7 @@ class SnakeApp:
         self.leaderboard_frame = tk.Frame(
             self.main_frame,
             bg=self.theme["bg"],
-            width=150,
+            width=250,
             height=self.height_px
         )
         self.leaderboard_frame.grid(row=0, column=1, rowspan=2, padx=10, sticky="ns")
@@ -310,15 +308,6 @@ class SnakeApp:
             fg=self.theme.get("bg", "#000")
         )
         self.btn_theme.pack(side=tk.LEFT, padx=5)
-
-        self.btn_ach = tk.Button(
-            self.controls_frame,
-            text="🏆 Ачивки (A)",
-            command=self.show_achievements,
-            bg=self.theme.get("snake_body", "#ccc"),
-            fg=self.theme.get("bg", "#000")
-        )
-        self.btn_ach.pack(side=tk.LEFT, padx=5)
 
         # Информационная метка
         self.info_label = tk.Label(
@@ -863,24 +852,24 @@ class SnakeApp:
     def _handle_step_event(self, event: str) -> None:
         """
         Обработка событий игрового шага.
-
-        Args:
-            event: Тип события ("eat", "die", "eat_bonus_*")
         """
         if event == "eat":
             self.sound.play("eat")
+            # ✅ Обновляем UI в реальном времени (счёт, длина, марафонец)
+            self._update_live_stats()
 
         elif event == "die":
             self.sound.play("gameover")
-            self.scores.update_score(self.player_name, self.game.score)
-            self._update_leaderboard_ui()
+            # Финальное обновление статистики при смерти
             self.achievements.update_session_end(
                 self.game.score,
                 len(self.game.snake),
                 self.session_bonuses
             )
+            # Финальная проверка достижений
             for ach in self.achievements.check_new_unlocks():
                 self._show_achievement_toast(f"{ach.icon} {ach.name}", ach.desc)
+            self._update_leaderboard_ui()
 
         elif event in ("eat_bonus_gold", "eat_bonus_slow", "eat_bonus_magnet"):
             self.sound.play("eat")
@@ -903,7 +892,7 @@ class SnakeApp:
                     "y": hy * self.cell_size + self.cell_size / 2,
                     "text": "❄️ SLOW",
                     "color": "#00BFFF",
-                    "life": self.effect_life
+                    "life": 30
                 })
 
             elif event == "eat_bonus_magnet":
@@ -913,8 +902,11 @@ class SnakeApp:
                     "y": hy * self.cell_size + self.cell_size / 2,
                     "text": "🧲 MAGNET",
                     "color": "#FF1493",
-                    "life": self.effect_life
+                    "life": 30
                 })
+
+            # ✅ Обновляем UI в реальном времени (бонусы, охотник за бонусами, первая кровь)
+            self._update_live_stats()
 
         # Ускорение от очков
         self.current_delay = max(
@@ -968,18 +960,65 @@ class SnakeApp:
             pass
 
     def _update_leaderboard_ui(self) -> None:
-        """Обновление списка лидеров в интерфейсе."""
+        """Обновление списка лидеров и достижений текущего игрока в одной панели."""
         self.lb_listbox.delete(0, tk.END)
-        top = self.scores.get_leaderboard(10)
 
+        # ═══════════════════════════════════════════
+        # РАЗДЕЛ 1: ТАБЛИЦА ЛИДЕРОВ
+        # ═══════════════════════════════════════════
+
+        top = self.achievements.get_leaderboard(10)
         if not top:
-            self.lb_listbox.insert(tk.END, "Нет данных")
-            return
+            self.lb_listbox.insert(tk.END, "  Нет данных")
+        else:
+            medals = ['🥇', '🥈', '🥉']
+            for i, (name, score) in enumerate(top):
+                prefix = medals[i] if i < 3 else f"{i + 1}."
+                # Выделяем текущего игрока
+                if name == self.player_name:
+                    self.lb_listbox.insert(tk.END, f"▶ {prefix} {name}: {score} ◀")
+                else:
+                    self.lb_listbox.insert(tk.END, f"  {prefix} {name}: {score}")
 
-        medals = ['🥇', '🥈', '🥉']
-        for i, (name, score) in enumerate(top):
-            prefix = medals[i] if i < 3 else f"{i + 1}."
-            self.lb_listbox.insert(tk.END, f"{prefix} {name}: {score}")
+        # ═══════════════════════════════════════════
+        # РАЗДЕЛ 2: ДОСТИЖЕНИЯ ИГРОКА
+        # ═══════════════════════════════════════════
+        self.lb_listbox.insert(tk.END, "")
+        self.lb_listbox.insert(tk.END, "═════════════════════════")
+        self.lb_listbox.insert(tk.END, "🎯 ДОСТИЖЕНИЯ!")
+        self.lb_listbox.insert(tk.END, f"   Игрок: {self.player_name}")
+        self.lb_listbox.insert(tk.END, "═════════════════════════")
+
+        # Разблокированные достижения
+        self.lb_listbox.insert(tk.END, "")
+        self.lb_listbox.insert(tk.END, "✅ Разблокированные:")
+        unlocked = [ach for ach in self.achievements.achievements.values() if ach.unlocked]
+        if unlocked:
+            for ach in unlocked:
+                icon = f"{ach.icon} " if ach.icon else ""
+                self.lb_listbox.insert(tk.END, f"  • {icon}{ach.name}")
+        else:
+            self.lb_listbox.insert(tk.END, "  (пока нет)")
+
+        # Неразблокированные достижения
+        self.lb_listbox.insert(tk.END, "")
+        self.lb_listbox.insert(tk.END, "🔒 Неразблокированные:")
+        locked = [ach for ach in self.achievements.achievements.values() if not ach.unlocked]
+        if locked:
+            for ach in locked:
+                icon = f"{ach.icon} " if ach.icon else ""
+                self.lb_listbox.insert(tk.END, f"  • {icon}{ach.name}")
+        else:
+            self.lb_listbox.insert(tk.END, "  (все открыты!)")
+
+        # Статистика игрока
+        self.lb_listbox.insert(tk.END, "")
+        self.lb_listbox.insert(tk.END, "📊 Статистика:")
+        stats = self.achievements.stats
+        self.lb_listbox.insert(tk.END, f"  • Макс. счёт: {stats.get('max_score', 0)}")
+        self.lb_listbox.insert(tk.END, f"  • Макс. длина: {stats.get('max_length', 0)}")
+        self.lb_listbox.insert(tk.END, f"  • Бонусов: {stats.get('total_bonuses', 0)}")
+        self.lb_listbox.insert(tk.END, f"  • Игр сыграно: {stats.get('games_played', 0)}")
 
     def handle_key(self, event: tk.Event) -> None:
         """
@@ -991,11 +1030,6 @@ class SnakeApp:
         # Пауза
         if event.keysym in ("space", "p", "P"):
             self.toggle_pause()
-            return
-
-        # Достижения
-        if event.keysym in ("a", "A"):
-            self.show_achievements()
             return
 
         # Управление в паузе
@@ -1062,9 +1096,28 @@ class SnakeApp:
         self.update_info()
         self._update_leaderboard_ui()
 
+    def _update_live_stats(self) -> None:
+        """
+        Обновляет статистику, проверяет достижения и обновляет UI
+        в реальном времени во время игры.
+        """
+        # 1. Обновляем live-статистику (max_score, max_length, session_bonuses)
+        self.achievements.update_live_stats(
+            self.game.score,
+            len(self.game.snake),
+            self.session_bonuses
+        )
+
+        # 2. Проверяем новые достижения (сразу показываем тосты)
+        for ach in self.achievements.check_new_unlocks():
+            self._show_achievement_toast(f"{ach.icon} {ach.name}", ach.desc)
+
+        # 3. Обновляем панель лидеров и достижений
+        self._update_leaderboard_ui()
+
     def update_info(self) -> None:
         """Обновление информационной метки."""
-        best = self.scores.get_best_score(self.player_name)
+        best = self.achievements.get_best_score(self.player_name)
         status = " | GAME OVER | R - рестарт" if self.game.game_over else ""
         pause_text = " | ⏸ ПАУЗА" if self.is_paused else ""
 
@@ -1110,38 +1163,6 @@ class SnakeApp:
             self.toast_label.destroy()
             self.toast_label = None
 
-    def show_achievements(self) -> None:
-        """Открыть окно со списком достижений."""
-        win = tk.Toplevel(self.root)
-        win.title(" Достижения")
-        win.geometry("320x420")
-        win.config(bg="#1e1e1e")
-        win.transient(self.root)
-        win.grab_set()
-
-        tk.Label(
-            win,
-            text="Ваши трофеи:",
-            bg="#1e1e1e",
-            fg="#fff",
-            font=("Arial", 12, "bold")
-        ).pack(pady=10)
-
-        frame = tk.Frame(win, bg="#1e1e1e")
-        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-
-        for ach in self.achievements.achievements.values():
-            status = "✅" if ach.unlocked else "🔒"
-            color = "#00ff00" if ach.unlocked else "#666666"
-            tk.Label(
-                frame,
-                text=f"{status} {ach.icon} {ach.name}\n   {ach.desc}",
-                bg="#1e1e1e",
-                fg=color,
-                justify=tk.LEFT,
-                anchor="w",
-                pady=6
-            ).pack(fill=tk.X)
 
     def _activate_test_event(self) -> None:
         """Активация тестового бонуса (если указан через --event)."""
